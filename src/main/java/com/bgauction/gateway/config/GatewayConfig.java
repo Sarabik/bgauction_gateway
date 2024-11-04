@@ -21,6 +21,8 @@ public class GatewayConfig {
                         .uri("lb://AUCTIONSERVICE"))
                 .route("bid_service", r -> r.path("/bid/**")
                         .uri("lb://BIDSERVICE"))
+                .route("notification_service", r -> r.path("/notification/**")
+                        .uri("lb://NOTIFICATIONSERVICE"))
                 .build();
     }
 
