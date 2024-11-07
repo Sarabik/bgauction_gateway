@@ -1,8 +1,9 @@
 package com.bgauction.gateway.config;
 
-import com.bgauction.gateway.security.JwtAuthenticationFilter;
-import com.bgauction.gateway.security.ServiceKeyAddingFilter;
-import com.bgauction.gateway.security.ServiceKeyCheckFilter;
+import com.bgauction.gateway.filters.JwtAuthenticationFilter;
+import com.bgauction.gateway.filters.LogoutFilter;
+import com.bgauction.gateway.filters.ServiceKeyAddingFilter;
+import com.bgauction.gateway.filters.ServiceKeyCheckFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
@@ -16,18 +17,27 @@ public class GatewayConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ServiceKeyCheckFilter serviceKeyCheckFilter;
     private final ServiceKeyAddingFilter serviceKeyAddingFilter;
+    private final LogoutFilter logoutFilter;
 
     public GatewayConfig(@Value("${service.internal-key}") String serviceInternalKey,
                          JwtAuthenticationFilter jwtAuthenticationFilter,
-                         ServiceKeyCheckFilter serviceKeyCheckFilter, ServiceKeyAddingFilter serviceKeyAddingFilter) {
+                         ServiceKeyCheckFilter serviceKeyCheckFilter,
+                         ServiceKeyAddingFilter serviceKeyAddingFilter,
+                         LogoutFilter logoutFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.serviceKeyCheckFilter = serviceKeyCheckFilter;
         this.serviceKeyAddingFilter = serviceKeyAddingFilter;
+        this.logoutFilter = logoutFilter;
     }
 
     @Bean
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
         return builder.routes()
+                /* logout */
+                .route("logout_route", r -> r
+                        .path("/auth/logout")
+                        .filters(f -> f.filter(logoutFilter))
+                        .uri("no://op"))
 
                 /* internal */
                 .route("internal_user_route", r -> r.path("/internal/user/**")
@@ -44,12 +54,16 @@ public class GatewayConfig {
                         .uri("lb://BIDSERVICE"))
 
                 /* external */
+
                 /* USER */
-                .route("external_auth_route", r -> r.path("/auth/**")
+                .route("external_auth_route", r -> r
+                        .path("/auth/register")
+                        .or().path("/auth/login")
                         .uri("lb://USERSERVICE"))
                 .route("external_user_route", r -> r.path("/user/**")
                         .filters(f -> f.filter(jwtAuthenticationFilter))
                         .uri("lb://USERSERVICE"))
+
                 /* GAME */
                 .route("not_secured_external_game_route", r -> r
                         .path("/game/{id}")
@@ -67,6 +81,7 @@ public class GatewayConfig {
                         .path("/game/user/**")
                         .filters(f -> f.filter(jwtAuthenticationFilter)) // Применить фильтр
                         .uri("lb://GAMESERVICE"))
+
                 /* AUCTION */
                 .route("not_secured_external_auction_route", r -> r
                         .path("/auction/**")
@@ -80,6 +95,7 @@ public class GatewayConfig {
                         .method(HttpMethod.GET).negate()
                         .filters(f -> f.filter(jwtAuthenticationFilter))
                         .uri("lb://AUCTIONSERVICE"))
+
                 /* BID */
                 .route("not_secured_external_bid_route", r -> r
                         .path("/bid/auction/**")
